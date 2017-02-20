@@ -1,4 +1,10 @@
-from flask import Blueprint
+from flask import Blueprint, render_template
+import bcrypt
+
+from user.forms import RegisterForm
+from user.models import User
+
+
 
 #  Flask uses a concept of blueprints for making application components
 #  and supporting common patterns within an application or across applications.
@@ -14,5 +20,28 @@ user_app = Blueprint('user_app', __name__)
 @user_app.route('/login')
 def login():
     return 'User login'
-    
+
+@user_app.route('/register', methods=('GET', 'POST'))
+def register():
+   form = RegisterForm()
+   if form.validate_on_submit(): #  ie passes validation
+       # generate a salt (password generation key)
+       salt = bcrypt.gensalt()
+       # encrypt the password using the salt key
+       hashed_password = bcrypt.hashpw(form.password.data, salt)
+       # Create the user object
+       user = User(
+           username=form.username.data,
+           password=hashed_password,
+           email=form.email.data,
+           first_name=form.first_name.data,
+           last_name=form.last_name.data
+           )
+          
+       # save the user to the database
+       user.save()
+       return 'User registered'
+       
+   return render_template('user/register.html', form=form)
+   
     

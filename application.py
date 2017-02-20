@@ -4,9 +4,13 @@ from flask.ext.mongoengine import MongoEngine
 #  Create a global variable db
 db = MongoEngine()
 
-def create_app():
+def create_app(**config_overrides):
+    #  Create the app using the configs settings.py
     app = Flask(__name__)
     app.config.from_pyfile('settings.py')
+    #  However if overides are present then use these instead
+    #  eg if testing (see user/tests.py)
+    app.config.update(config_overrides)
     
     #  initialize the database in the app
     db.init_app(app)
@@ -25,3 +29,4 @@ def create_app():
     
     app.register_blueprint(user_app)
     return app
+
