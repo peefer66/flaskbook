@@ -31,7 +31,7 @@ class UserTest(unittest.TestCase):
 
     def tearDown(self):
         db = _get_db()
-        db.client.drop_database(db)
+        db.connection.drop_database(db)
         
      # TEST METHODS
      # For python each test has to begin with test_testname()
