@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, request, session
+from flask import Blueprint, render_template, redirect, request, session, url_for
 import bcrypt
 
 from user.forms import RegisterForm, LoginForm
@@ -44,6 +44,17 @@ def register():
 def login():
     form = LoginForm()
     error = None
+    # Require a method that if the login page is accwssed from anoher page
+    # say the profile, then a re-direct back to the page of origin will be necessary
+    # this is handled by the 'next' method
+    
+    # first check that the method accesing the login page was a GET and that
+    # the GET request contains a next
+    if request.method=='GET' and request.args.get('next'):
+        # store that next in a session so that it can redirect back
+        session['next'] = request.args.get('next')
+        
+        
     if form.validate_on_submit(): # Valid entry in the form
         #  Examine database to see if the user exists
         #  Find the first occurance because only unique usernames should be
@@ -53,9 +64,20 @@ def login():
         if user:
             #  Check password is correct by comparing the hashed passwords
             if bcrypt.hashpw(form.password.data, user.password)==user.password:
-                #  set the session to the username
-                session['username']=form.username.data
-                return 'User logged in'
+                #  if a next session exists. A next session is created when 
+                # the login is accessed from another page
+                if 'next' in session:
+                    # get that session url and store as next
+                    next = session.get('next')
+                    # delete the session[next] so that further redirects will not happen
+                    session.pop('next')
+                    # rediect back to the page of origin
+                    return redirect(next)
+                else:   
+                    #  if there was no next 
+                    #  set the session to the username and return to user logged in/user
+                    session['username']=form.username.data
+                    return 'User logged in'
             else:
                 user = None
         #  Use 'if not user' here rather than else bc the user may be correct but the password not
@@ -64,5 +86,16 @@ def login():
             error =  'Incorrect username / password'
         
     return render_template('user/login.html', form=form, error=error)
+    
+@user_app.route('/logout', methods=('GET', 'POST'))
+def logout():
+    # first delete session
+    session.pop('username')
+    # Redirect using the Blueprint
+    return redirect(url_for('user_app.login'))
+    
+@user_app.route('/profile', methods=('GET', 'POST'))
+def profile():
+    return render_template(url_for('user/profile.html'))
    
     
