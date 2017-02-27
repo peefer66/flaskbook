@@ -94,8 +94,10 @@ def logout():
     # Redirect using the Blueprint
     return redirect(url_for('user_app.login'))
     
-@user_app.route('/profile', methods=('GET', 'POST'))
-def profile():
-    return render_template(url_for('user/profile.html'))
+@user_app.route('/<username>', methods=('GET', 'POST'))
+def profile(username):
+    # find the user and pass to the profile html
+    user = User.objects.filter(username=username).first()
+    return render_template('user/profile.html', user=user)
    
     
