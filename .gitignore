@@ -9,3 +9,4 @@ __pycache__
 venv
 settings.py
 static/images
+aws.txt

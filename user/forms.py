@@ -2,25 +2,32 @@ from flask_wtf import Form # documents => http://wtforms.readthedocs.io/en/lates
 from wtforms import validators, StringField, PasswordField
 from wtforms.fields.html5 import EmailField
 from wtforms.validators import ValidationError
+from wtforms.widgets import TextArea
 import re
 
 #  Seperate the application level packages from the python level packages
 from user.models import User
 
-
-class RegisterForm(Form):
+#  Create a BaseUserForm class so that the same field can be inherited by other
+#  form classes. 
+class BaseUserForm(Form):
     first_name = StringField('First Name',[validators.DataRequired()])
     last_name = StringField('Last Name', [validators.DataRequired()])
     email = EmailField('Email Address', [
         validators.DataRequired(),
         validators.email()
         ])
-        
     username = StringField('Username', [
         validators.DataRequired(),
         validators.length(min=4, max=25)
         ])
-    
+    bio = StringField('Bio',
+    widget = TextArea(),
+    validators = [validators.length(max=160)]
+    )
+ 
+#  Register form that inherits the names username emai etc from the BaseUserForm 
+class RegisterForm(BaseUserForm):  
     #  .EqualTo = The password and the confirm password fields must match
     #  if not then pass message
     password = PasswordField('New Password', [
@@ -63,7 +70,10 @@ class LoginForm(Form):
         validators.DataRequired(),
         validators.length(min=4, max=80)
         ])
-    
-
+ 
+ #  The edit form will just be a replica of the registration form
+ #  so can just put a pass in the code
+class EditForm(BaseUserForm):
+    pass
     
         

@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, redirect, request, session, url_for
+from flask import Blueprint, render_template, redirect, request, session, url_for, abort
 import bcrypt
 
-from user.forms import RegisterForm, LoginForm
+from user.forms import RegisterForm, LoginForm, EditForm
 from user.models import User
 
 
@@ -31,7 +31,8 @@ def register():
            password=hashed_password,
            email=form.email.data,
            first_name=form.first_name.data,
-           last_name=form.last_name.data
+           last_name=form.last_name.data,
+           bio=form.bio.data
            )
           
        # save the user to the database
@@ -96,8 +97,69 @@ def logout():
     
 @user_app.route('/<username>', methods=('GET', 'POST'))
 def profile(username):
+    #  first set edit profile flag to false
+    edit_profile = False
     # find the user and pass to the profile html
     user = User.objects.filter(username=username).first()
-    return render_template('user/profile.html', user=user)
+    
+    # If the session of that username exists and the current user is that
+    # username then they are looking at their own profile
+    if session.get('username') and user.username==session.get('username'):
+        # set the edit-profile to true
+        edit_profile = True
+    # if the user was found    
+    if user:
+        #  return the user/profile.html and pass the edit_profile flag
+        # It will be false if looking at somebody elses profile
+        # True if looking at own
+        return render_template('user/profile.html', user=user, edit_profile=edit_profile)
+    #  The user doesnt exist
+    else:
+        abort(404)
+        
+@user_app.route('/edit', methods=('GET', 'POST'))
+def edit():
+    error = None
+    message = None 
+    user = User.objects.filter(username=session.get('username')).first()
+    
+    #  If the user was found
+    if user:
+        #  obj=user is wtfform special usage thta prfills the form with user object
+        form = EditForm(obj=user)
+        if form.validate_on_submit():
+            #  Check to see if username is changing
+            if user.username != form.username.data:
+            # Check to see if username already exists
+                if User.objects.filter(username = form.username.data.lower()).first():
+                    error = 'Username already exists'
+                else:
+                    # set the session to that of the username(lowercase)
+                    session['username'] = form.username.data.lower()
+                    #  set the username in the form to lowercase
+                    form.username.data = form.username.data.lower()
+            
+            # Check if the email has chanmged
+            if user.email != form.email.data:
+                # The email has changed but check that it doesnt already exist
+                if User.objects.filter(email=form.email.data.lower()).first():
+                    error = 'email already exists'
+                else:
+                    # Change to lower case if needed
+                    form.email.data = form.email.data.lower()
+                    
+            #  If there are no errors Populate the user object with the new info
+            if not error:
+                # use a WTForm specuial usage to populate the user obj and
+                # save (rather UPDATE) to DB
+                form.populate_obj(user)
+                user.save()
+                message = 'Profile updated'
+        return render_template('user/edit.html', form=form, error=error, message=message)
+    else:
+        # No user found
+        abort(404)
+        
+    
    
     
