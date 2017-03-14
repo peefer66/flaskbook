@@ -13,12 +13,14 @@ class User(db.Document):
     email = db.StringField(db_field='e', required=True, unique=True)
     first_name = db.StringField(db_field='fn', max_length=50)
     last_name = db.StringField(db_field='ln', max_length=50)
-    
     #  create a time stamp(NB NOT a date because a time stampe cn give more 
     #  information). Use a helper function 
     created = db.IntField(db_field='c', default=now())
     bio = db.StringField(db_field='b', max_length=160)
-    
+    #  Confirm email. Usually after registration the email of the account is verified
+    email_confirmed = db.BooleanField(db_field='ecf', default=False)
+    # A dictionary object in json format
+    change_configuration = db.DictField(db_field='cc')
     #  Add the indexes by using the meta properties of the class. Give a string
     #  of the indexes. The minus created means that the sort orfer is reversed
     meta = {

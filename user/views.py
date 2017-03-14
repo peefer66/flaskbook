@@ -1,8 +1,14 @@
 from flask import Blueprint, render_template, redirect, request, session, url_for, abort
 import bcrypt
+# UUID values are 128 bits long and “can guarantee uniqueness across space
+# and time”. They are useful for identifiers for documents, hosts, application
+# clients, and other situations where a unique value is necessary. 
+# The RFC is specifically geared toward creating a Uniform Resource Name namespace.
+import uuid # universal unique identifier
 
 from user.forms import RegisterForm, LoginForm, EditForm
 from user.models import User
+from utilities.common import email
 
 
 
@@ -20,11 +26,13 @@ user_app = Blueprint('user_app', __name__)
 @user_app.route('/register', methods=('GET', 'POST'))
 def register():
    form = RegisterForm()
-   if form.validate_on_submit(): #  ie passes validation
+   if form.validate_on_submit():#  ie passes validation
        # generate a salt (password generation key)
        salt = bcrypt.gensalt()
        # encrypt the password using the salt key
        hashed_password = bcrypt.hashpw(form.password.data, salt)
+       # Create a unique identifier and store in the change_configuration field
+       code = str(uuid.uuid4())
        # Create the user object
        user = User(
            username=form.username.data,
@@ -32,10 +40,15 @@ def register():
            email=form.email.data,
            first_name=form.first_name.data,
            last_name=form.last_name.data,
-           bio=form.bio.data
-           )
-          
-       # save the user to the database
+           bio=form.bio.data,
+           change_configuration={"new_email": form.email.data.lower(),"confirmation_code": code})
+        # Email verification to the user
+       body_html = render_template('mail/user/register.html', user=user)
+       body_text = render_template('mail/user/register.txt', user=user)
+        
+       email(user.email, 'Welcome to Flaskbook', body_html, body_text)
+        
+        # save the user to the database
        user.save()
        return 'User registered'
        
