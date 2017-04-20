@@ -263,7 +263,7 @@ def password_reset(username, code):
             user.change_configuration = {}
             user.save()
             # Check to see if the user session exists and delete
-            if session('username'):
+            if session.get('username'):
                 session.pop('username')
             return redirect(url_for('user_app.password_reset_complete'))
         
@@ -272,6 +272,7 @@ def password_reset(username, code):
         form=form,
         message=message,
         require_current=require_current,
+        username=username,
         code=code
     )
 

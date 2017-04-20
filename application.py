@@ -6,6 +6,7 @@ db = MongoEngine()
 
 def create_app(**config_overrides):
     #  Create the app using the configs settings.py
+    # The over-tides allows for the testing
     app = Flask(__name__)
     app.config.from_pyfile('settings.py')
     #  However if overides are present then use these instead
