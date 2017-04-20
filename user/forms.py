@@ -9,13 +9,14 @@ import re
 from user.models import User
 
 #  Create a BaseUserForm class so that the same field can be inherited by other
-#  form classes. 
+#  form classes. The password will be handled in a seperate class to handle forgotten
+# passwords and standard change oif password
 class BaseUserForm(Form):
     first_name = StringField('First Name',[validators.DataRequired()])
     last_name = StringField('Last Name', [validators.DataRequired()])
     email = EmailField('Email Address', [
         validators.DataRequired(),
-        validators.email()
+        validators.Email()
         ])
     username = StringField('Username', [
         validators.DataRequired(),
@@ -26,8 +27,8 @@ class BaseUserForm(Form):
     validators = [validators.length(max=160)]
     )
  
-#  Register form that inherits the names username emai etc from the BaseUserForm 
-class RegisterForm(BaseUserForm):  
+
+class PasswordBaseForm(Form):  
     #  .EqualTo = The password and the confirm password fields must match
     #  if not then pass message
     password = PasswordField('New Password', [
@@ -36,7 +37,10 @@ class RegisterForm(BaseUserForm):
         validators.length(min=4, max=80)
         ])
     confirm = PasswordField('Repeat Password')
-    
+
+#  Register form that inherits the names username emai etc from the BaseUserForm 
+#  and inherits fro the PasswordBaseForm
+class RegisterForm(PasswordBaseForm, BaseUserForm):
     #  In order to provide custom validation for a single field without
     #  needing to write a one-time-use validator, validation can be defined
     #  inline by defining a method with the convention validate_fieldname:
@@ -64,11 +68,11 @@ class RegisterForm(BaseUserForm):
 class LoginForm(Form):
     username = StringField('Username', [
         validators.DataRequired(),
-        validators.length(min=4, max=25)
+        validators.Length(min=4, max=25)
         ])
     password = PasswordField('Password', [
         validators.DataRequired(),
-        validators.length(min=4, max=80)
+        validators.Length(min=4, max=80)
         ])
  
  #  The edit form will just be a replica of the registration form
@@ -76,4 +80,22 @@ class LoginForm(Form):
 class EditForm(BaseUserForm):
     pass
     
+
+# If the user has forgotten their password
+# does not inherit from BaseUserForm
+class ForgotForm(Form):
+    email = EmailField('email', [
+        validators.DataRequired(),
+        validators.Email()
+        ])
+
+# If the user is just changing their password as part of a profile edit
+# Then confirmation is done using their current password. Inherited from
+# PasswordBaseForm
+class PasswordResetForm(PasswordBaseForm):
+    current_password = PasswordField('Current password', [
+        validators.DataRequired(),
+        validators.Email(),
+        validators.Length(min=4, max=80)
+        ])
         

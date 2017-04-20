@@ -39,10 +39,10 @@ class UserTest(unittest.TestCase):
      # a number of test. No code repartion
     def user_dict(self):
         return dict(
-            first_name="Jorge",
-            last_name="Escobar",
-            username="jorge",
-            email="jorge@example.com",
+            first_name="Peter",
+            last_name="Fieldhouse",
+            username="peefer",
+            email="peefer66@hotmail.com",
             password="test123",
             confirm="test123"
             )
@@ -74,6 +74,21 @@ class UserTest(unittest.TestCase):
         #assert User.objects.filter(username=user3['username'].lower()).count() == 1
         assert User.objects.filter(email=user3['email'].lower()).count() == 1
         
+        # Test for confirmation email
+        user = User.objects.get(username=self.user_dict()['username'])
+        code = user.change_configuration.get('confirmation_code')
+        rv = self.app.get('/confirm/' + user.username + '/' + code)
+        assert 'Your email has been confirmed' in str(rv.data)
+        
+        # Try agsin to confirm
+        rv = self.app.get('/confirm/' + user.username + '/' + code)
+        assert rv.status_code == 404
+        
+        # Check change configuration is empty
+        user = User.objects.get(username=self.user_dict()['username'])
+        assert user.change_configuration == {}
+        
+
         
     def test_login(self):
         # Create the user - remember the database will be blank at thi point
@@ -92,7 +107,15 @@ class UserTest(unittest.TestCase):
     def test_edit_profile(self):
         #  Craete a user
         self.app.post('/register', data=self.user_dict())
-        # login
+        
+        # Confirm the user
+        user = User.objects.get(username=self.user_dict()['username'])
+        code = user.change_configuration.get('confirmation_code')
+        rv = self.app.get('/confirm/' + user.username + '/' + code)
+        
+        
+        
+        # login the user
         rv = self.app.post('/login', data=dict(
             username=self.user_dict()['username'],
             password=self.user_dict()['password']
@@ -106,7 +129,22 @@ class UserTest(unittest.TestCase):
         user['first_name'] = 'Firstname'
         user['last_name'] = 'Lastname'
         user['username'] = 'Testusername'
-        user['email']  = 'Test@Example.com'
+        
+        # check new email is in change configuration
+        user['email'] = "test@example.com"
+        rv = self.app.post('/edit', data=user)
+        assert "You will need to confirm the new email to complete this change" in str(rv.data)
+        db_user = User.objects.first()
+        code = db_user.change_configuration.get('confirmation_code')
+        new_email = db_user.change_configuration.get('new_email')
+        assert new_email == user['email']
+        
+        # Now confirm
+        rv = self.app.get('/confirm/' + db_user.username + '/' + code)
+        db_user = User.objects.first()
+        assert db_user.email == user['email']
+        assert db_user.change_configuration == {}
+        
         
         # Edit the user -- post
         rv = self.app.post('/edit', data=user)
@@ -140,3 +178,15 @@ class UserTest(unittest.TestCase):
         user['username'] = "TestUsername"
         rv = self.app.post('/edit', data=user)
         assert "Username already exists" in str(rv.data) 
+        
+    def test_get_profile(self):
+        # create a user
+        self.app.post('/register', data=self.user_dict())
+        
+        # get the user's profile
+        rv = self.app.get('/' + self.user_dict()['username'])
+        assert self.user_dict()['username'] in str(rv.data)
+        
+        # get a 404
+        rv = self.app.get('/noexist')
+        assert rv.status_code == 404

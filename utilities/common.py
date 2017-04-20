@@ -1,5 +1,6 @@
 import time
 import boto3
+from flask import current_app # Flask utility that returns the current runing flask app
 
 #  Function for a time stamp
 def utc_now_ts():
@@ -7,7 +8,11 @@ def utc_now_ts():
     
     
 def email(to_email, subject, body_html, body_text):
-    # instantiat a boto3 ses client
+    # DON'T RUN THIS IF CONDUCTING A TEST
+    if current_app.config.get('TESTING'):
+        return False
+    
+    # instantiat a boto3 SES client
     client = boto3.client('ses')
     return client.send_email(
         # email from

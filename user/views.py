@@ -6,7 +6,7 @@ import bcrypt
 # The RFC is specifically geared toward creating a Uniform Resource Name namespace.
 import uuid # universal unique identifier
 
-from user.forms import RegisterForm, LoginForm, EditForm
+from user.forms import RegisterForm, LoginForm, EditForm, ForgotForm, PasswordResetForm
 from user.models import User
 from utilities.common import email
 
@@ -31,7 +31,7 @@ def register():
        salt = bcrypt.gensalt()
        # encrypt the password using the salt key
        hashed_password = bcrypt.hashpw(form.password.data, salt)
-       # Create a unique identifier and store in the change_configuration field
+       # Create a unique identifier to store in the change_configuration field
        code = str(uuid.uuid4())
        # Create the user object
        user = User(
@@ -142,7 +142,9 @@ def edit():
         form = EditForm(obj=user)
         if form.validate_on_submit():
             #  Check to see if username is changing
-            if user.username != form.username.data:
+            # also the case may have changes so potetially give a false positive
+            # therefore set username lower case.
+            if user.username != form.username.data.lower():
             # Check to see if username already exists
                 if User.objects.filter(username = form.username.data.lower()).first():
                     error = 'Username already exists'
@@ -158,8 +160,27 @@ def edit():
                 if User.objects.filter(email=form.email.data.lower()).first():
                     error = 'email already exists'
                 else:
-                    # Change to lower case if needed
-                    form.email.data = form.email.data.lower()
+                    # email has changed but does not already exist
+                    # sent verification email
+                    code = str(uuid.uuid4())
+                    user.change_configuration = {
+                        'new_email':form.email.data.lower(),
+                        'confirmation_code':code
+                    }
+                    
+                    #set the email confirmation to false
+                    user.email_confirmed = False
+                    # Change the form email to the old email otherwise the new email
+                    # will be changed without the confirmation
+                    form.email.data = user.email
+                    message = 'You will need to confirm the new email to complete this change'
+                    
+                    # Email the user
+                    body_html = render_template('mail/user/change_email.html', user=user)
+                    body_text = render_template('mail/user/change_email.txt', user=user)
+                    email(user.change_configuration['new_email'], 'Confirm your new email', body_html, body_text)
+        
+                    
                     
             #  If there are no errors Populate the user object with the new info
             if not error:
@@ -167,12 +188,95 @@ def edit():
                 # save (rather UPDATE) to DB
                 form.populate_obj(user)
                 user.save()
-                message = 'Profile updated'
+                # The new email has been confirmed
+                if not message:
+                    message = 'Profile updated'
         return render_template('user/edit.html', form=form, error=error, message=message)
     else:
         # No user found
         abort(404)
         
+@user_app.route('/confirm/<username>/<code>', methods=('GET', 'POST'))
+def confirm(username, code):
+    #  See if user exists. Remember username is unique
+    user = User.objects.filter(username=username).first()
+    # if the user exists and the change cofiguration is true and has a change 
+    # configuration code email return address to confirm user registration
+    if user and user.change_configuration and user.change_configuration.get('confirmation_code'):
+        if code == user.change_configuration.get('confirmation_code'):
+            user.email =  user.change_configuration.get('new_email')
+            user.change_configuration = {}
+            user.email_confirmed = True
+            user.save()
+            return render_template('user/email_confirmed.html')
+    else:
+        # one or all criteria was faulse
+        abort(404)
+
+
+@user_app.route('/forgot', methods=('GET', 'POST'))
+def forgot():
+    error = None
+    message = None
+    form = ForgotForm()
     
-   
+    if form.validate_on_submit():
+        user = User.objects.filter(email=form.email.data.lower()).first()
+        if user:
+            # create validation code
+            code = str(uuid.uuid4())
+            user.change_configuration={'password_reset_code':code}
+            user.save()
     
+            # email the user
+            body_html = render_template('mail/user/password_reset.html', user=user)
+            body_text = render_template('mail/user/password_reset.txt', user=user)
+            email(user.email, 'Password reset request', body_html, body_text)
+            message = 'You will recieve a password reset email if we find the email in our system'
+            
+    return render_template('user/forgot.html', form=form, error=error, message=message)
+    
+@user_app.route('/password_reset/<username>/<code>', methods=('GET', 'POST'))
+def password_reset(username, code):
+    form = PasswordResetForm()
+    message = None
+    require_current = None
+    
+    
+    user = User.objects.filter(username=username).first()
+    # if the user dont exist or the reset code is wrong
+    if not user or code != user.change_configuration.get('password_reset_code'):
+        abort(404)
+    # Bipass the form validation to be able to delete the current password 
+    # without throwing the form validation.datarequired wich would throw an error
+    if request.method == 'POST':
+        del form.current_password
+        # Now we can validate
+        if form.validate_on_submit():
+            # create a salt
+            salt = bcrypt.gensalt()
+            # create hashed password passing the new password and the salt
+            hashed_password = bcrypt.hashpw(form.password.data, salt)
+            # Change the users password to the hashed password
+            user.password = hashed_password
+            # Change the change_configuration to a empty dict
+            user.change_configuration = {}
+            user.save()
+            # Check to see if the user session exists and delete
+            if session('username'):
+                session.pop('username')
+            return redirect(url_for('user_app.password_reset_complete'))
+        
+    # If not POST
+    return render_template('user/password_reset.html',
+        form=form,
+        message=message,
+        require_current=require_current,
+        code=code
+    )
+
+
+@user_app.route('/password_reset_complete')
+def password_reset_complete():
+    return render_template('user/password_change_confirmed.html')            
+            
